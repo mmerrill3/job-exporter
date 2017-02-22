@@ -53,9 +53,9 @@ func (l JobsLister) List() ([]v1.Job, error) {
 func RegisterJobsCollector(registry prometheus.Registerer, kubeClient kubernetes.Interface) {
 	client := kubeClient.Extensions().RESTClient()
 	jlw := cache.NewListWatchFromClient(client, "jobs", api.NamespaceAll, nil)
-	jinf := cache.NewSharedInformer(jlw, &[]v1.Job{}, resyncPeriod)
+	jinf := cache.NewSharedInformer(jlw, &v1.Job{}, resyncPeriod)
 
-	jLister := JobsLister(func() (jobList v1.JobList, err error) {
+	jLister := JobsLister(func() (jobs []v1.Job, err error) {
 		for _, c := range jinf.GetStore().List() {
 			jobs = append(jobs, *(c.(*v1.Job)))
 		}
@@ -78,7 +78,8 @@ type jobsCollector struct {
 // Describe implements the prometheus.Collector interface.
 func (jc *jobsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- descJobStatus
-	ch <- descJobTime
+	ch <- descJobStartTime
+	ch <- descJobCompletionTime
 }
 
 // Collect implements the prometheus.Collector interface.
@@ -89,7 +90,7 @@ func (jc *jobsCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 	for _, j := range jls {
-		jc.collectJobsSet(ch, j)
+		jc.collectJobs(ch, j)
 	}
 }
 
@@ -98,12 +99,12 @@ func (jc *jobsCollector) collectJobs(ch chan<- prometheus.Metric, j v1.Job) {
 		lv = append([]string{j.Namespace, j.Name}, lv...)
 		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, lv...)
 	}
-	if(j.Status.Active > 0) {
-		addGauge(descJobStatus, 2))
-	} else if(j.Status.Failed > 0) {
-		addGauge(descJobStatus, 0))
+	if j.Status.Active > 0 {
+		addGauge(descJobStatus, 2)
+	} else if j.Status.Failed > 0 {
+		addGauge(descJobStatus, 0)
 	} else {
-		addGauge(descJobStatus, 1))
+		addGauge(descJobStatus, 1)
 	}
 	addGauge(descJobStartTime, float64(j.Status.StartTime.Unix()))
 	addGauge(descJobCompletionTime, float64(j.Status.CompletionTime.Unix()))
