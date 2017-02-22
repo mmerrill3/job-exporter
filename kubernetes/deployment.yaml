@@ -1,0 +1,17 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: job-exporter-deployment
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: job-exporter
+        version: "v0.1.1"
+    spec:
+      containers:
+      - name: job-exporter
+        image: 080385600816.dkr.ecr.us-east-1.amazonaws.com/job-exporter:0.1.1
+        ports:
+        - containerPort: 8080
