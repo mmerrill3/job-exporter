@@ -1,65 +1,28 @@
-# Copyright 2015 Mike Merrill
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+all: build
 
-GO     ?= GO15VENDOREXPERIMENT=1 go
-GOPATH := $(firstword $(subst :, ,$(GOPATH)))
-PROMU  ?= $(GOPATH)/bin/promu
-pkgs    = $(shell $(GO) list ./... | grep -v /vendor/)
+FLAGS =
+COMMONENVVAR = GOOS=darwin GOARCH=amd64
+BUILDENVVAR = CGO_ENABLED=0
+TESTENVVAR = 
+REGISTRY = gcr.io/google_containers
+TAG = $(shell git describe --abbrev=0)
 
-PREFIX                  ?= $(shell pwd)
-BIN_DIR                 ?= $(shell pwd)
-DOCKER_IMAGE_NAME       ?= job-exporter
-DOCKER_IMAGE_TAG        ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
+deps:
+	go get github.com/tools/godep
 
+build: clean deps
+	$(COMMONENVVAR) $(BUILDENVVAR) godep go build -o job_exporter
 
-all: format build test
+test-unit: clean deps build
+	$(COMMONENVVAR) $(TESTENVVAR) godep go test --race . $(FLAGS)
 
-style:
-	@echo ">> checking code style"
-	@! gofmt -d $(shell find . -path ./vendor -prune -o -name '*.go' -print) | grep '^'
+container: build
+	docker build -t ${REGISTRY}/job_exporter:$(TAG) .
 
-test:
-	@echo ">> running tests"
-	@$(GO) test -short $(pkgs)
+push: container
+	gcloud docker push ${REGISTRY}/job_exporter:$(TAG)
 
-test-e2e: build
-	@echo ">> running end-to-end tests"
-	./end-to-end-test.sh
+clean:
+	rm -f job_exporter
 
-format:
-	@echo ">> formatting code"
-	@$(GO) fmt $(pkgs)
-
-vet:
-	@echo ">> vetting code"
-	@$(GO) vet $(pkgs)
-
-build: $(PROMU)
-	@echo ">> building binaries"
-	@$(PROMU) build --prefix $(PREFIX)
-
-tarball: $(PROMU)
-	@echo ">> building release tarball"
-	@$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
-
-docker:
-	@echo ">> building docker image"
-	@docker build -t "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
-
-$(GOPATH)/bin/promu promu:
-	@GOOS=$(shell uname -s | tr A-Z a-z) \
-		GOARCH=$(subst x86_64,amd64,$(patsubst i%86,386,$(shell uname -m))) \
-		$(GO) get -u github.com/prometheus/promu
-
-
-.PHONY: all style format build test test-e2e vet tarball docker promu $(GOPATH)/bin/promu
+.PHONY: all deps build test-unit container push clean

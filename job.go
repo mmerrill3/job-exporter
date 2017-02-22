@@ -17,13 +17,14 @@ limitations under the License.
 package main
 
 import (
-	"github.com/golang/glog"
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/apis/batch/v1"
+	v1 "k8s.io/client-go/pkg/apis/batch/v1"
 	"k8s.io/client-go/tools/cache"
+	"os"
 )
 
 var (
@@ -51,7 +52,7 @@ func (l JobsLister) List() ([]v1.Job, error) {
 }
 
 func RegisterJobsCollector(registry prometheus.Registerer, kubeClient kubernetes.Interface) {
-	client := kubeClient.Extensions().RESTClient()
+	client := kubeClient.BatchV1().RESTClient()
 	jlw := cache.NewListWatchFromClient(client, "jobs", api.NamespaceAll, nil)
 	jinf := cache.NewSharedInformer(jlw, &v1.Job{}, resyncPeriod)
 
@@ -86,7 +87,7 @@ func (jc *jobsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (jc *jobsCollector) Collect(ch chan<- prometheus.Metric) {
 	jls, err := jc.store.List()
 	if err != nil {
-		glog.Errorf("listing jobs failed: %s", err)
+		fmt.Fprintf(os.Stderr, "listing jobs failed: %s", err)
 		return
 	}
 	for _, j := range jls {
@@ -106,6 +107,10 @@ func (jc *jobsCollector) collectJobs(ch chan<- prometheus.Metric, j v1.Job) {
 	} else {
 		addGauge(descJobStatus, 1)
 	}
-	addGauge(descJobStartTime, float64(j.Status.StartTime.Unix()))
-	addGauge(descJobCompletionTime, float64(j.Status.CompletionTime.Unix()))
+	if nil != j.Status.StartTime {
+		addGauge(descJobStartTime, float64(j.Status.StartTime.Unix()))
+	}
+	if nil != j.Status.CompletionTime {
+		addGauge(descJobCompletionTime, float64(j.Status.CompletionTime.Unix()))
+	}
 }

@@ -19,19 +19,17 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"strings"
-	"time"
-
-	"github.com/golang/glog"
 	"github.com/openshift/origin/pkg/util/proc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+	"time"
 )
 
 const (
@@ -62,7 +60,7 @@ func (c *collectorSet) Set(value string) error {
 	for _, col := range cols {
 		_, ok := availableCollectors[col]
 		if !ok {
-			glog.Fatalf("Collector \"%s\" does not exist", col)
+			fmt.Fprintf(os.Stderr, "Collector \"%s\" does not exist", col)
 		}
 		s[col] = struct{}{}
 	}
@@ -95,7 +93,7 @@ type options struct {
 }
 
 func main() {
-	// configure glog
+	// configure fmt
 	flag.CommandLine.Parse([]string{})
 	flag.Lookup("logtostderr").Value.Set("true")
 
@@ -116,7 +114,7 @@ func main() {
 
 	err := flags.Parse(os.Args)
 	if err != nil {
-		glog.Fatalf("Error: %s", err)
+		fmt.Fprintf(os.Stderr, "Error: %s", err)
 	}
 
 	if options.help {
@@ -126,24 +124,24 @@ func main() {
 
 	var collectors collectorSet
 	if len(options.collectors) == 0 {
-		glog.Infof("Using default collectors")
+		fmt.Printf("Using default collectors")
 		collectors = defaultCollectors
 	} else {
 		collectors = options.collectors
 	}
 
 	if isNotExists(options.kubeconfig) && !(options.inCluster) {
-		glog.Fatalf("kubeconfig invalid and --in-cluster is false; kubeconfig must be set to a valid file(kubeconfig default file name: $HOME/.kube/config)")
+		fmt.Fprintf(os.Stderr, "kubeconfig invalid and --in-cluster is false; kubeconfig must be set to a valid file(kubeconfig default file name: $HOME/.kube/config)")
 	}
 	if options.apiserver != "" {
-		glog.Infof("apiserver set to: %v", options.apiserver)
+		fmt.Printf("apiserver set to: %v", options.apiserver)
 	}
 
 	proc.StartReaper()
 
 	kubeClient, err := createKubeClient(options.inCluster, options.apiserver, options.kubeconfig)
 	if err != nil {
-		glog.Fatalf("Failed to create client: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to create client: %v", err)
 	}
 
 	registerCollectors(kubeClient, collectors)
@@ -173,8 +171,8 @@ func createKubeClient(inCluster bool, apiserver string, kubeconfig string) (kube
 		if len(config.BearerToken) > 0 {
 			tokenPresent = true
 		}
-		glog.Infof("service account token present: %v", tokenPresent)
-		glog.Infof("service host: %s", config.Host)
+		fmt.Printf("service account token present: %v", tokenPresent)
+		fmt.Printf("service host: %s", config.Host)
 		if kubeClient, err = clientset.NewForConfig(config); err != nil {
 			return nil, err
 		}
@@ -200,12 +198,12 @@ func createKubeClient(inCluster bool, apiserver string, kubeconfig string) (kube
 	// Informers don't seem to do a good job logging error messages when it
 	// can't reach the server, making debugging hard. This makes it easier to
 	// figure out if apiserver is configured incorrectly.
-	glog.Infof("Testing communication with server")
+	fmt.Printf("Testing communication with server")
 	_, err = kubeClient.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("ERROR communicating with apiserver: %v", err)
 	}
-	glog.Infof("Communication with server successful")
+	fmt.Printf("Communication with server successful")
 
 	return kubeClient, nil
 }
@@ -214,7 +212,7 @@ func metricsServer(port int) {
 	// Address to listen on for web interface and telemetry
 	listenAddress := fmt.Sprintf(":%d", port)
 
-	glog.Infof("Starting job metrics server: %s", listenAddress)
+	fmt.Printf("Starting job metrics server: %s", listenAddress)
 	// Add metricsPath
 	http.Handle(metricsPath, prometheus.UninstrumentedHandler())
 	// Add healthzPath
@@ -250,5 +248,5 @@ func registerCollectors(kubeClient clientset.Interface, enabledCollectors collec
 		}
 	}
 
-	glog.Infof("Active collectors: %s", strings.Join(activeCollectors, ","))
+	fmt.Printf("Active collectors: %s", strings.Join(activeCollectors, ","))
 }
