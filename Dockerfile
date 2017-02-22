@@ -1,7 +1,8 @@
-FROM        quay.io/prometheus/busybox:latest
+FROM scratch
 MAINTAINER  Michael Merrill <michael.merrill@vonage.com>
+COPY job-exporter /
+VOLUME /tmp
 
-COPY job_exporter /bin/job_exporter
+ENTRYPOINT ["/job-exporter", "--port=8080"]
 
-EXPOSE      9100
-ENTRYPOINT  [ "/bin/job_exporter" ]
+EXPOSE 8080
