@@ -1,0 +1,23 @@
+package: vonage.io/monitoring/job-exporter
+import:
+- package: github.com/openshift/origin
+  version: ^1.4.1
+  subpackages:
+  - pkg/util/proc
+- package: github.com/prometheus/client_golang
+  version: ^0.8.0
+  subpackages:
+  - prometheus
+- package: github.com/spf13/pflag
+- package: golang.org/x/net
+  subpackages:
+  - context
+- package: k8s.io/client-go
+  version: ^2.0.0
+  subpackages:
+  - kubernetes
+  - pkg/api
+  - pkg/apis/batch/v1
+  - rest
+  - tools/cache
+  - tools/clientcmd

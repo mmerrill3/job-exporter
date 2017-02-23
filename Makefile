@@ -5,20 +5,23 @@ COMMONENVVAR = GOOS=linux GOARCH=amd64
 BUILDENVVAR = CGO_ENABLED=0
 TESTENVVAR = 
 REGISTRY = 080385600816.dkr.ecr.us-east-1.amazonaws.com
-TAG = 0.0.1
+TAG = 0.0.6
 LOGIN:=$(shell aws ecr get-login)
 
 deps:
-	go get github.com/tools/godep
+	glide install -v
 
-build: clean deps
-	$(COMMONENVVAR) $(BUILDENVVAR) godep go build -o job-exporter
+#build: clean deps
+#	$(COMMONENVVAR) $(BUILDENVVAR) go build -o job-exporter
+
+build: 
+	$(COMMONENVVAR) $(BUILDENVVAR) go build -o job-exporter
 
 test-unit: clean deps build
-	$(COMMONENVVAR) $(TESTENVVAR) godep go test --race . $(FLAGS)
+	$(COMMONENVVAR) $(TESTENVVAR) go test --race . $(FLAGS)
 
 container: build
-	#docker build -t job-exporter:$(TAG) .
+	docker build -t job-exporter:$(TAG) .
 
 push: container
 	exec ${LOGIN}
@@ -26,6 +29,8 @@ push: container
 	docker push ${REGISTRY}/job-exporter:$(TAG)
 
 clean:
-	rm -f job_exporter
+	rm -f job-exporter
+	rm -fr vendor
+	rm -f glide.lock
 
 .PHONY: all deps build test-unit container push clean
